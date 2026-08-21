@@ -42,6 +42,14 @@ public:
     }
 };
 
+class TraceMmuStore {
+public:
+    u64 address = 0;
+    u32 length = 0;
+    u8 bytes[8] = {};
+    bool error = false;
+};
+
 
 enum RegionType  {mem = 0, io = 1};
 class Region{
@@ -55,6 +63,7 @@ public:
     CpuMemoryView *memory;
     u32 hartId;
     queue <TraceIo> ioQueue;
+    queue <TraceMmuStore> mmuStoreQueue;
     vector<Region> regions;
     cfg_t cfg;
     map<size_t, processor_t*> harts;
@@ -67,6 +76,7 @@ public:
     virtual bool mmio_mmu(reg_t addr, size_t len, u8* bytes);
     virtual bool mmio_load(reg_t addr, size_t len, u8* bytes);
     virtual bool mmio_store(reg_t addr, size_t len, const u8* bytes);
+    virtual bool mmio_mmu_store(reg_t addr, size_t len, const u8* bytes);
     virtual void proc_reset(unsigned id);
     virtual const cfg_t &get_cfg() const;
     virtual const map<size_t, processor_t*>& get_harts() const;
@@ -118,6 +128,7 @@ public:
     void trap(bool interrupt, u32 code);
     void commit(u64 pc);
     void ioAccess(TraceIo io);
+    void mmuStore(u64 address, u32 length, u64 data, bool error);
     void setInt(u32 id, bool value);
     void scStatus(bool failure);
     void addRegion(Region r);

@@ -26,6 +26,7 @@ public class Frontend  {
     public static native boolean trap(long handle, int hartId, boolean interrupt, int code);
     public static native String getLastErrorMessage(long handle);
     public static native void ioAccess(long handle, int hartId, boolean write, long address, long data, int mask, int size, boolean error);
+    public static native void mmuStore(long handle, int hartId, long address, int lengthBytes, long data, boolean error);
     public static native void setInterrupt(long handle, int hartId, int intId, boolean value);
     public static native void addRegion(long handle, int hartId, int kind, long base, long size);
     public static native boolean loadExecute(long handle, int hartId, long id, long addr, long len, long data);

@@ -182,6 +182,29 @@ bool SpikeIf::mmio_store(reg_t addr, size_t len, const u8* bytes)  {
 
     return false;
 }
+
+bool SpikeIf::mmio_mmu_store(reg_t addr, size_t len, const u8* bytes) {
+    assertTrue(hartId, "missing MMU store event\n", !mmuStoreQueue.empty());
+    const auto &dut = mmuStoreQueue.front();
+
+    assertEq(hartId, "MMU store address\n", dut.address, addr);
+    assertEq(hartId, "MMU store length\n", dut.length, len);
+    assertTrue(hartId, "MMU store data\n", len <= sizeof(dut.bytes) && !memcmp(dut.bytes, bytes, len));
+
+    if (dut.error) {
+        mmuStoreQueue.pop();
+        return false;
+    }
+
+    auto region = getRegion(addr);
+    const bool inMemory = region != NULL && region->type == RegionType::mem &&
+                          len <= region->size && addr - region->base <= region->size - len;
+    assertTrue(hartId, "successful MMU store outside a memory region\n", inMemory);
+
+    memory->memory.write(addr, len, const_cast<u8*>(bytes));
+    mmuStoreQueue.pop();
+    return true;
+}
 // Callback for processors to let the simulation know they were reset.
 void SpikeIf::proc_reset(unsigned id)  {
 //        printf("proc_reset %d\n", id);
@@ -314,7 +337,7 @@ static const reg_t dump_csrs[] = {
     CSR_MCOUNTEREN, CSR_MCOUNTINHIBIT, CSR_MSCRATCH, CSR_MEPC, CSR_MCAUSE,
     CSR_MTVAL, CSR_MIP, CSR_MTINST, CSR_MTVAL2,
     CSR_HSTATUS, CSR_HEDELEG, CSR_HIDELEG, CSR_HIE, CSR_HCOUNTEREN,
-    CSR_HTVAL, CSR_HIP, CSR_HVIP, CSR_HTINST, CSR_HGATP,
+    CSR_HTVAL, CSR_HIP, CSR_HVIP, CSR_HTINST, CSR_HGATP, CSR_HDLTCTL, CSR_HDLTIDX,
     CSR_MCYCLE, CSR_MINSTRET, CSR_TIME
 };
 
@@ -354,6 +377,17 @@ std::string Hart::formatFailureContext() const {
        << "\n";
     ss << "  scValid=" << scValid << " scFailure=" << scFailure << "\n";
     ss << "  interruptPending=" << formatHex(interruptPending, regWidth) << "\n";
+
+    ss << "MMU store FIFO: depth=" << sif->mmuStoreQueue.size() << "\n";
+    if(!sif->mmuStoreQueue.empty()) {
+        const auto &front = sif->mmuStoreQueue.front();
+        ss << "  front: address=" << formatHex(front.address, 16)
+           << " length=" << front.length
+           << " data=0x";
+        for(u32 i = 0; i < front.length && i < sizeof(front.bytes); ++i)
+            ss << std::format("{:02x}", front.bytes[i]);
+        ss << " error=" << front.error << "\n";
+    }
 
     if(state) {
         ss << "spike log_reg_write:\n";
@@ -624,6 +658,16 @@ void Hart::commit(u64 pc){
 
 void Hart::ioAccess(TraceIo io){
     sif->ioQueue.push(io);
+}
+
+void Hart::mmuStore(u64 address, u32 length, u64 data, bool error) {
+    assertTrue(hartId, "MMU store event is wider than 8 bytes\n", length <= 8);
+    TraceMmuStore event;
+    event.address = address;
+    event.length = length;
+    event.error = error;
+    memcpy(event.bytes, &data, length);
+    sif->mmuStoreQueue.push(event);
 }
 
 void Hart::setInt(u32 id, bool value){

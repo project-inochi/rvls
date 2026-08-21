@@ -84,6 +84,17 @@ void checkFile(std::ifstream &lines, RvlsConfig &config){
                     f >> hartId;
                     auto io = TraceIo(f);
                     rv->ioAccess(io);
+                } else if (str == "mmu") {
+                    f >> str;
+                    if(str == "store") {
+                        u32 hartId, length;
+                        u64 address, data;
+                        bool error;
+                        f >> hartId >> hex >> address >> dec >> length >> hex >> data >> dec >> error;
+                        rv->mmuStore(address, length, data, error);
+                    } else {
+                        throw runtime_error(line);
+                    }
                 } else if (str == "trap") {
                     u32 hartId, code;
                     bool interrupt;

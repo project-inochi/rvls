@@ -173,6 +173,10 @@ rvlsJni(ioAccess), int hartId, jboolean write, long address, long data, int mask
     rv->ioAccess(a);
 }
 
+rvlsJni(mmuStore), int hartId, long address, int lengthBytes, long data, jboolean error){
+    rv->mmuStore(address, lengthBytes, data, error);
+}
+
 rvlsJni(setInterrupt), int hartId, int intId, jboolean value){
     rv->setInt(intId, value);
 }

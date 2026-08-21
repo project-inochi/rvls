@@ -48,6 +48,7 @@ trait TraceBackend{
   def commit(hartId : Int, pc : Long, instruction : Long): Unit
   def trap(hartId: Int, interrupt : Boolean, code : Int)
   def ioAccess(hartId: Int, access : TraceIo) : Unit
+  def mmuStore(hartId: Int, address: Long, lengthBytes: Int, data: Long, error: Boolean): Unit
   def setInterrupt(hartId : Int, intId : Int, value : Boolean) : Unit
   def addRegion(hartId : Int, kind : Int, base : Long, size : Long) : Unit
   def addRegion(hartId : Int, kind : Int, mapping : AddressMapping) : Unit = {
@@ -84,6 +85,7 @@ class DummyBackend() extends TraceBackend{
   override def commit(hartId: Int, pc: Long, instruction : Long) = {}
   override def trap(hartId: Int, interrupt: Boolean, code: Int) = {}
   override def ioAccess(hartId: Int, access: TraceIo) = {}
+  override def mmuStore(hartId: Int, address: Long, lengthBytes: Int, data: Long, error: Boolean) = {}
   override def setInterrupt(hartId: Int, intId: Int, value: Boolean) = {}
   override def addRegion(hartId: Int, kind : Int, base: Long, size: Long) = {}
   override def loadExecute(hartId: Int, id: Long, addr: Long, len: Long, data: Long) = {}
@@ -125,6 +127,10 @@ class FileBackend(f : File) extends TraceBackend{
 
   def ioAccess(hartId: Int, access : TraceIo) : Unit = {
     log(f"rv io $hartId ${access.serialized()}\n")
+  }
+
+  override def mmuStore(hartId: Int, address: Long, lengthBytes: Int, data: Long, error: Boolean): Unit = {
+    log(f"rv mmu store $hartId $address%016x $lengthBytes $data%016x ${error.toInt}\n")
   }
 
   override def setInterrupt(hartId: Int, intId: Int, value: Boolean) = {
@@ -225,6 +231,7 @@ class RvlsBackend(workspace : File = new File(".")) extends TraceBackend{
     throw new Exception(Frontend.getLastErrorMessage(handle))
   }
   override def ioAccess(hartId: Int, access: TraceIo): Unit = Frontend.ioAccess(handle, hartId, access.write, access.address, access.data, access.mask, access.size, access.error)
+  override def mmuStore(hartId: Int, address: Long, lengthBytes: Int, data: Long, error: Boolean): Unit = Frontend.mmuStore(handle, hartId, address, lengthBytes, data, error)
   override def setInterrupt(hartId: Int, intId: Int, value: Boolean): Unit = Frontend.setInterrupt(handle, hartId, intId, value)
   override def addRegion(hartId: Int, kind: Int, base: Long, size: Long): Unit = Frontend.addRegion(handle, hartId, kind, base, size)
   override def loadExecute(hartId: Int, id: Long, addr: Long, len: Long, data: Long): Unit = if(!Frontend.loadExecute(handle, hartId, id, addr, len, data)) throw new Exception(Frontend.getLastErrorMessage(handle))
